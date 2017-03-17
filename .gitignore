@@ -1,0 +1,8 @@
+
+*.bak
+*~
+.vagrant/
+
+config.rb
+user-data
+user-data-[0-9]*
