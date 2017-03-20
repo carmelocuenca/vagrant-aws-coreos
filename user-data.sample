@@ -7,9 +7,10 @@ coreos:
     initial-advertise-peer-urls: http://$private_ipv4:2380
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
-    discovery: https://discovery.etcd.io/1f588123f5b0aa4e1d445cd4e097cbfe
+    discovery: https://discovery.etcd.io/f9d6a0503799253d5cda889d006dd40a
   fleet:
     public-ip: "$public_ipv4"
+    metadata: host=hello-world
   flannel:
     interface: "$public_ipv4"
   units:
@@ -17,12 +18,14 @@ coreos:
     command: start
   - name: fleet.service
     command: start
+    enable: true
   - name: flanneld.service
     drop-ins:
     - name: 50-network-config.conf
       content: |
         [Service]
-        ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.0.0.0/16" }'
+        ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config \
+          '{ "Network": "10.0.0.0/16" }'
     command: start
   - name: docker-tcp.socket
     command: start
@@ -38,20 +41,34 @@ coreos:
 
       [Install]
       WantedBy=sockets.target
-  - name: hello-world.service
+  - name: hello-world.fleet.service
     command: start
     content: |
-      [Unit]
-      Description=Hello World! Service
-      After=docker.service
-      Requires=docker.service
+    [Unit]
+    Description=A fleet example unit
 
-      [Service]
-      TimeoutStartSec=0
-      ExecStartPre=/usr/bin/docker pull busybox
-      ExecStartPre=-/usr/bin/docker rm hello-world
-      ExecStart=/usr/bin/docker run --rm --name  hello-world busybox /bin/sh -c \
-        "while true; do echo Hello World!; sleep 15; done"
-      ExecStop=/usr/bin/docker stop hello-world
-      [Install]
-      WantedBy=multi-user.target
+    [Service]
+    Type=oneshot
+    ExecStartPre=/bin/sh -c "sleep 10\"
+    ExecStart=/usr/bin/fleetctl start /home/core/hello-world.service"
+
+write_files:
+- path: "/home/core/hello-world.service"
+  owner: core:core
+  permissions: 420
+  content: |
+    [Unit]
+    Description=Hello World! Service
+    After=docker.service
+    Requires=docker.service
+
+    [Service]
+    TimeoutStartSec=0
+    ExecStartPre=/usr/bin/docker pull busybox
+    ExecStartPre=-/usr/bin/docker rm hello-world
+    ExecStart=/usr/bin/docker run --rm --name  hello-world busybox /bin/sh -c \
+      "while true; do echo Hello World!; sleep 15; done"
+    ExecStop=/usr/bin/docker stop hello-world
+
+    [X-Fleet]
+    MachineMetadata=host=hello-world

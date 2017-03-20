@@ -55,7 +55,6 @@ Vagrant.configure("2") do |config|
       # To automatically replace the discovery token on 'vagrant up'
       if File.exists?(CLOUD_CONFIG_PATH) && ARGV[0].eql?('up')
         user_data_specific	=	"#{CLOUD_CONFIG_PATH}-#{i}"
-
         require 'yaml'
         data = YAML.load(IO.readlines(CLOUD_CONFIG_PATH)[1..-1].join)
         yaml = YAML.dump(data)

@@ -1,6 +1,36 @@
 # A Vagrantfile for a CoreOS Cluster in Amazon Web Services
 
+## Version 0.2
+A ```Vagrantfile``` to launch ```$num_instances``` with CoreOS in Amazon Web
+Services (AWS). The file ```use-data.sample``` define a unit (```systemd``` ) ```hello-world.fleet.service``` which launchs a ```hello-world.service``` in all
+machine with metadata ```host=hello-world```. The file ```config.rb.sample```
+instruments the metadata.
 
+Listado de MVs.
+
+```
+$ vagrant ssh core-01 -c 'fleetctl list-machines'
+MACHINE		IP		METADATA
+7ddca11c...	34.205.231.105	host=hello-world
+95987f44...	34.197.162.32	host=hello-world
+b51dec65...	34.205.3.71	host=hello-world
+```
+Listado de las unidades por MVs
+```
+$ for i in `seq 1 3`; do vagrant ssh core-0$i -c 'fleetctl list-units'; done
+UNIT			MACHINE				ACTIVE	SUB
+hello-world.service	95987f44.../34.197.162.32	active	running
+Connection to ec2-34-205-231-105.compute-1.amazonaws.com closed.
+UNIT			MACHINE				ACTIVE	SUB
+hello-world.service	95987f44.../34.197.162.32	active	running
+Connection to ec2-34-197-162-32.compute-1.amazonaws.com closed.
+UNIT			MACHINE				ACTIVE	SUB
+hello-world.service	95987f44.../34.197.162.32	active	running
+Connection to ec2-34-205-3-71.compute-1.amazonaws.com closed.
+
+```
+
+## Version 0.1
 A ```Vagrantfile``` to launch ```$num_instances``` with CoreOS in Amazon Web
 Services (AWS). It also launchs a ```hello-world``` unit systemd.
 
@@ -68,9 +98,13 @@ $ vagrant ssh core-01 -c 'etcdctl cluster-health'
 and the CoreOS should be healthy
 
 ## Service hello-world
-Cheack the availability with
+Cheack the availability of service hello-world with
 ```
 $ vagrant ssh core-01 -c 'journalctl -u hello-world'
+```
+or
+```
+$ vagrant ssh core-01 -c 'systemctl status hello-world'
 ```
 
 ## Is something wrong?
