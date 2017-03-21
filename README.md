@@ -152,3 +152,4 @@ have more than 3 machines in all zones.
 * Monitoring
 * Scaling
 * Terraform
+* EBS for volumes

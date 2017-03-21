@@ -7,7 +7,7 @@ coreos:
     initial-advertise-peer-urls: http://$private_ipv4:2380
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
-    discovery: https://discovery.etcd.io/1ad9129fe9147699056009c6a2183756
+    discovery: https://discovery.etcd.io/4932013f8d8a537e37643af2131daf21
   fleet:
     public-ip: "$public_ipv4"
     metadata: host=hello-world
@@ -41,6 +41,16 @@ coreos:
 
       [Install]
       WantedBy=sockets.target
+  - name: postgresql.fleet.service
+    command: start
+    content: |
+      [Unit]
+      Description=A fleet postgresql unit
+
+      [Service]
+      Type=oneshot
+      ExecStartPre=/bin/sh -c "sleep 10"
+      ExecStart=/usr/bin/fleetctl start /home/core/postgresql.service
   - name: nginx.fleet.service
     command: start
     content: |
@@ -112,6 +122,28 @@ write_files:
 
     [X-Fleet]
     MachineMetadata=host=hello-world
+- path: "/home/core/postgresql.service"
+  owner: core:core
+  permissions: '0644'
+  content: |
+    [Unit]
+    Description=PostgreSQL database
+    After=docker.service
+    Requires=docker.service
+
+    [Service]
+    TimeoutStartSec=0
+    EnvironmentFile=/home/core/etc/postgres-credentials.env
+    ExecStartPre=-/usr/bin/docker kill some-postgres
+    ExecStartPre=-/usr/bin/docker rm some-postgres
+    ExecStartPre=/usr/bin/docker pull postgres
+    ExecStart=/usr/bin/docker run --rm --name some-postgres \
+      -e "POSTGRES_USER=${POSTGRES_USER}" -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+      -p "5432:5432" postgres
+    ExecStop=/usr/bin/docker stop some-postgres
+
+    [X-Fleet]
+    MachineMetadata=host=hello-world
 - path: "/home/core/hello-world.service"
   owner: core:core
   permissions: '0644'
@@ -126,8 +158,8 @@ write_files:
     ExecStartPre=/usr/bin/docker pull busybox
     ExecStartPre=-/usr/bin/docker rm hello-world
     ExecStart=/usr/bin/docker run --rm --name  hello-world busybox /bin/sh -c \
-      "while true; do echo Hello World!; sleep 15; done"
+      "while true; do echo %h: Hello World!; sleep 15; done"
     ExecStop=/usr/bin/docker stop hello-world
 
     [X-Fleet]
-    MachineMetadata=host=hello-world
+    Global=true
