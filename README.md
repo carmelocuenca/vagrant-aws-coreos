@@ -1,5 +1,32 @@
 # A Vagrantfile for a CoreOS Cluster in Amazon Web Services
 
+## Version 0.3
+The file ```use-data.sample``` define a unit (```systemd``` ) ```nginx.fleet.service``` which launchs a ```nginx.service``` in all
+machine with metadata ```host=hello-world```. The file ```config.rb.sample```
+instruments the metadata.
+
+Listado de las unidades por MVs
+```
+$ for i in `seq 1 3`; do vagrant ssh core-0$i -c 'fleetctl list-units'; done
+UNIT			MACHINE				ACTIVE	SUB
+hello-world.service	5860ac61.../34.200.178.239	active	running
+nginx.service		2c89b8dd.../34.205.222.231	active	running
+Connection to ec2-34-205-222-231.compute-1.amazonaws.com closed.
+UNIT			MACHINE				ACTIVE	SUB
+hello-world.service	5860ac61.../34.200.178.239	active	running
+nginx.service		2c89b8dd.../34.205.222.231	active	running
+Connection to ec2-34-206-189-110.compute-1.amazonaws.com closed.
+UNIT			MACHINE				ACTIVE	SUB
+hello-world.service	5860ac61.../34.200.178.239	active	running
+nginx.service		2c89b8dd.../34.205.222.231	active	running
+Connection to ec2-34-200-178-239.compute-1.amazonaws.com closed.
+```
+
+Y comprobación de las unidades
+```
+$ for i in `seq 1 3`; do vagrant ssh core-0$i -c 'curl http://localhost/index.html'; done
+
+```
 ## Version 0.2
 A ```Vagrantfile``` to launch ```$num_instances``` with CoreOS in Amazon Web
 Services (AWS). The file ```use-data.sample``` define a unit (```systemd``` ) ```hello-world.fleet.service``` which launchs a ```hello-world.service``` in all
@@ -27,7 +54,6 @@ Connection to ec2-34-197-162-32.compute-1.amazonaws.com closed.
 UNIT			MACHINE				ACTIVE	SUB
 hello-world.service	95987f44.../34.197.162.32	active	running
 Connection to ec2-34-205-3-71.compute-1.amazonaws.com closed.
-
 ```
 
 ## Version 0.1
@@ -118,3 +144,11 @@ $ vagrant up --debug
 ```InUse => Address 10.0.0.x is in use```. Be patient and try again.
 * Are you in the free layer? You can only have 3 machines up, so check if you
 have more than 3 machines in all zones.
+
+
+## More?
+* Multitenant
+* ELK
+* Monitoring
+* Scaling
+* Terraform

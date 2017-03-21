@@ -57,6 +57,11 @@ Vagrant.configure("2") do |config|
         user_data_specific	=	"#{CLOUD_CONFIG_PATH}-#{i}"
         require 'yaml'
         data = YAML.load(IO.readlines(CLOUD_CONFIG_PATH)[1..-1].join)
+        if	data['coreos'].key?	'fleet'
+          # data['coreos']['fleet']['metadata']	=	"host=service_%02d"	%	[i]
+          # data['coreos']['fleet']['metadata']	=	'host=hello-world'
+        end
+
         yaml = YAML.dump(data)
 
         File.open(user_data_specific,	'w') do |file|

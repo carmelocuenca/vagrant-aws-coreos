@@ -17,6 +17,10 @@ if File.exists?('user-data') && ARGV[0].eql?('up')
   if data.key? 'coreos' and data['coreos'].key? 'etcd2'
     data['coreos']['etcd2']['discovery'] = token
   end
+  if	data['coreos'].key?	'fleet'
+    # data['coreos']['fleet']['metadata']	=	"host=service_%02d"	%	[i]
+    data['coreos']['fleet']['metadata']	=	'host=hello-world'
+  end
 
   yaml = YAML.dump(data)
   File.open('user-data', 'w') { |file| file.write("#cloud-config\n\n#{yaml}") }

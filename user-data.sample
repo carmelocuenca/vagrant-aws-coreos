@@ -7,7 +7,7 @@ coreos:
     initial-advertise-peer-urls: http://$private_ipv4:2380
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
-    discovery: https://discovery.etcd.io/f9d6a0503799253d5cda889d006dd40a
+    discovery: https://discovery.etcd.io/1ad9129fe9147699056009c6a2183756
   fleet:
     public-ip: "$public_ipv4"
     metadata: host=hello-world
@@ -41,21 +41,80 @@ coreos:
 
       [Install]
       WantedBy=sockets.target
+  - name: nginx.fleet.service
+    command: start
+    content: |
+      [Unit]
+      Description=A fleet nginx unit
+
+      [Service]
+      Type=oneshot
+      ExecStartPre=/bin/sh -c "sleep 10"
+      ExecStart=/usr/bin/fleetctl start /home/core/nginx.service
   - name: hello-world.fleet.service
     command: start
     content: |
+      [Unit]
+      Description=A fleet example unit
+
+      [Service]
+      Type=oneshot
+      ExecStartPre=/bin/sh -c "sleep 10"
+      ExecStart=/usr/bin/fleetctl start /home/core/hello-world.service
+write_files:
+- path: "/home/core/etc/postgres-credentials.env"
+  owner: core:core
+  permissions: '0644'
+  content: |
+    POSTGRES_USER=postgres
+    POSTGRES_PASSWORD=postgres
+- path: "/home/core/etc/nginx/nginx.conf"
+  owner: core:core
+  permissions: '0644'
+  content: |
+    server {
+      listen 80;
+      root /usr/src/app/public;
+      location / {
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        try_files $uri /page_cache/$uri /page_cache/$uri.html @app;
+      }
+      location @app{
+        proxy_pass http://app:9292;
+        break;
+      }
+    }
+- path: "/home/core/usr/src/app/public/index.html"
+  owner: core:core
+  permissions: '0644'
+  content: |
+    <p>Hello World!</p>
+- path: "/home/core/nginx.service"
+  owner: core:core
+  permissions: '0644'
+  content: |
     [Unit]
-    Description=A fleet example unit
+    Description=some-nginx container that runs a reverse proxy server and a web server
+    After=docker.service
+    Requires=docker.service
 
     [Service]
-    Type=oneshot
-    ExecStartPre=/bin/sh -c "sleep 10\"
-    ExecStart=/usr/bin/fleetctl start /home/core/hello-world.service"
+    TimeoutStartSec=0
+    ExecStartPre=-/usr/bin/docker kill some-nginx
+    ExecStartPre=-/usr/bin/docker rm some-nginx
+    ExecStartPre=/usr/bin/docker pull nginx
+    ExecStart=/usr/bin/docker run --rm --name some-nginx \
+      -v "/home/core/etc/nginx/nginx.conf:/etc/nginx/conf.d/default.conf" \
+      -p "80:80" -v "/home/core/usr/src/app/public:/usr/src/app/public" nginx
+    ExecStop=/usr/bin/docker stop some-nginx
 
-write_files:
+    [X-Fleet]
+    MachineMetadata=host=hello-world
 - path: "/home/core/hello-world.service"
   owner: core:core
-  permissions: 420
+  permissions: '0644'
   content: |
     [Unit]
     Description=Hello World! Service
