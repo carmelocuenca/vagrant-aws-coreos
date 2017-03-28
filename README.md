@@ -1,5 +1,20 @@
 # A Vagrantfile for a CoreOS Cluster in Amazon Web Services
 
+## Version 0.4
+Flanneld is working in aws. Changes were needed in Vagrantfile and user-data.
+udp Backend is used in order to keep things simple.
+
+* The flannel unit for systemd was also changed ( avoid other subnets in the same vpc)
+
+```
+'{ "Network": "172.17.0.0/16/16", \
+   "Backend": { "Type": "udp" } }'
+```
+
+* After a lot of hours, the flannel entry in coreos key in user-data was completely removed
+
+In order to check flannel service, use docker inspect ... to get an ipaddress and from the other machine ping, something like this ```ping ip-addres-to-container-in-other-machine```.
+
 ## Version 0.3
 The file ```use-data.sample``` define a unit (```systemd``` ) ```nginx.fleet.service``` which launchs a ```nginx.service``` in all
 machine with metadata ```host=hello-world```. The file ```config.rb.sample```
@@ -146,6 +161,94 @@ $ vagrant up --debug
 have more than 3 machines in all zones.
 
 
+# Creating a conteneraizing Rails example application
+
+To create the application ```webapp```
+```
+$ docker run -it --rm --user "$(id -u):$(id -g)" -v "$PWD":/usr/src/app -w \
+    /usr/src/app rails rails new --skip-bundle --database postgresql webapp
+```
+
+To generate a ```Gemfile.lock``` file.
+```
+$ cd webapp
+$ docker run --rm -v "$PWD":/usr/src/app -w /usr/src/app ruby:2.3 \
+    bundle install
+```
+
+Then, create a Dockerfile with this content
+```
+FROM ruby:2.3
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        postgresql-client nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+COPY Gemfile* ./
+RUN bundle install
+COPY . .
+
+EXPOSE 3000
+CMD ["rails", "server", "-b", "0.0.0.0"]
+```
+
+To build the image
+```
+$ docker build -t webapp .
+```
+
+To run the image
+```
+$ docker run --name some-webapp -p 8080:3000 -d webapp
+```
+And to check the application
+```
+$ curl -L http://localhost:8080
+```
+
+To create dabases something similar to:
+
+```
+$ docker run  --link some-postgres:db \
+  -e "POSTGRES_USER=${POSTGRES_USER}" \
+  -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+  -v "$PWD":/usr/src/app -w /usr/src/app webapp  bin/rails db:create
+
+```
+
+To create a resource
+```
+$ docker run  --user "$(id -u):$(id -g)" -v "$PWD":/usr/src/app \
+    -w /usr/src/app --link some-postgres:db \
+    -e "POSTGRES_USER=${POSTGRES_USER}" \
+    -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" webapp bin/rails g scaffold \
+    article title:string body:text
+```
+
+To migrate
+```
+$ docker run  --link some-postgres:db \
+  -e "POSTGRES_USER=${POSTGRES_USER}" \
+  -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+  -v "$PWD":/usr/src/app -w /usr/src/app webapp  bin/rails db:migrate
+
+```
+
+
+To run the image
+```
+$ docker run  --rm -it --link some-postgres:db \
+  -e "POSTGRES_USER=${POSTGRES_USER}" \
+  -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+  -v "$PWD":/usr/src/app -w /usr/src/app -p 8080:3000 webapp
+```
+
+And setup the root page as usual
+
+
+
 ## More?
 * Multitenant
 * ELK
@@ -153,3 +256,6 @@ have more than 3 machines in all zones.
 * Scaling
 * Terraform
 * EBS for volumes
+* Production? TLS, SECRET_KEY
+* Cluster formation without public internet access
+* Change udp by aws-pc in flannel

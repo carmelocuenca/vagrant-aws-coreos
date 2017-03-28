@@ -7,12 +7,10 @@ coreos:
     initial-advertise-peer-urls: http://$private_ipv4:2380
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
-    discovery: https://discovery.etcd.io/4932013f8d8a537e37643af2131daf21
+    discovery: https://discovery.etcd.io/47effb380fd33997afa952dea605dfdb
   fleet:
     public-ip: "$public_ipv4"
     metadata: host=hello-world
-  flannel:
-    interface: "$public_ipv4"
   units:
   - name: etcd2.service
     command: start
@@ -20,13 +18,15 @@ coreos:
     command: start
     enable: true
   - name: flanneld.service
+    command: start
+    enable: true
     drop-ins:
     - name: 50-network-config.conf
       content: |
         [Service]
         ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config \
-          '{ "Network": "10.0.0.0/16" }'
-    command: start
+          '{ "Network": "172.17.0.0/16", \
+          "Backend": { "Type": "udp" } }'
   - name: docker-tcp.socket
     command: start
     enable: true
@@ -49,8 +49,11 @@ coreos:
 
       [Service]
       Type=oneshot
-      ExecStartPre=/bin/sh -c "sleep 10"
       ExecStart=/usr/bin/fleetctl start /home/core/postgresql.service
+  - name: app-job.fleet.service
+    command: start
+    content: "[Unit]\nDescription=An application setup unit \n\n[Service]\nType=oneshot\nExecStartPre=-/bin/sh
+      -c \"sleep 10\"\nExecStart=/usr/bin/fleetctl start /home/core/app-job.service\n"
   - name: nginx.fleet.service
     command: start
     content: |
@@ -144,6 +147,31 @@ write_files:
 
     [X-Fleet]
     MachineMetadata=host=hello-world
+- path: "/home/core/app-job.service"
+  owner: core:core
+  permissions: '0644'
+  content: |
+    [Unit]
+    Description=Task to create and migrate a database
+    After=docker.service
+    Requires=docker.service
+
+    [Service]
+    TimeoutStartSec=0
+    EnvironmentFile=/home/core/etc/postgres-credentials.env
+    ExecStartPre=-/usr/bin/docker kill app-job
+    ExecStartPre=-/usr/bin/docker rm app-job
+    ExecStartPre=/usr/bin/docker pull carmelocuenca/webapp
+    ExecStartPre=/usr/bin/docker pull alpine
+    ExecStartPre=-/usr/bin/docker run --rm --link some-postgres:postgres \
+      alpine /bin/sh -c \
+        'while ! nc -z postgres 5432; do echo "Waiting PostgreSQL to start on 5432..."; sleep 1; done; \
+         echo "PostgreSQL started"'
+    ExecStart=/usr/bin/docker run --rm --name app-job \
+      -e "POSTGRES_USER=${POSTGRES_USER}" -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+      -w "/usr/src/app" --link "some-postgres:db" \
+      carmelocuenca/webapp /bin/bash -c 'bin/rails db:setup && bin/rails db:migrate'
+    [X-Fleet]
 - path: "/home/core/hello-world.service"
   owner: core:core
   permissions: '0644'
@@ -158,7 +186,7 @@ write_files:
     ExecStartPre=/usr/bin/docker pull busybox
     ExecStartPre=-/usr/bin/docker rm hello-world
     ExecStart=/usr/bin/docker run --rm --name  hello-world busybox /bin/sh -c \
-      "while true; do echo %h: Hello World!; sleep 15; done"
+      "while true; do echo Hello World!; sleep 15; done"
     ExecStop=/usr/bin/docker stop hello-world
 
     [X-Fleet]

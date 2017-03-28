@@ -31,9 +31,10 @@ Vagrant.configure("2") do |config|
     # An array of security groups for the instance. If this instance will be
     # launched in VPC, this must be a list of security group Name. For a
     # nondefault VPC, you must use security group IDs instead
-    aws.security_groups = %w(sg-365fa149)
+    # aws.security_groups = %w(sg-365fa149)
+    aws.security_groups = %w(sg-9ee26de1)
     # The subnet to boot the instance into, for VPC.
-    aws.subnet_id = "subnet-96b6cee0" # vagrantVPC publicSubnet
+    aws.subnet_id = "subnet-684d4933"
     aws.keypair_name = "ec2privatekey"
     override.ssh.username = "core"
     override.ssh.private_key_path = ENV['HOME'] + "/.aws/awskey.pem"
@@ -69,6 +70,9 @@ Vagrant.configure("2") do |config|
         end
 
         config.vm.provider :aws do |aws, override|
+          # aws.iam_instance_profile_arn =
+          #   'arn:aws:iam::015850082106:instance-profile/flannel-role'
+
           aws.private_ip_address = "10.0.0.#{100+i}"
           aws.user_data = File.read(user_data_specific)
         end
